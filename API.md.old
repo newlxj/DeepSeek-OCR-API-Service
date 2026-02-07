@@ -1,0 +1,301 @@
+## 功能特性
+
+- ✅ PDF 文件转 Markdown
+- ✅ 单张图片转 Markdown
+- ✅ 多张图片批量转 Markdown
+- ✅ 队列处理（先进先出）
+- ✅ 同步/异步处理模式
+- ✅ 异步回调通知
+- ✅ 任务状态查询
+
+## 安装依赖
+
+```bash
+pip install -r requirements_api.txt
+```
+
+## 启动服务
+
+```bash
+# 方式1：使用 uvicorn 直接启动
+uvicorn api_service:app --host 0.0.0.0 --port 8000
+
+# 方式2：运行 Python 脚本
+python api_service.py
+
+# 方式3：生产环境启动（多worker）
+uvicorn api_service:app --host 0.0.0.0 --port 8000 --workers 1
+```
+
+注意：由于模型加载在内存中，建议使用单个 worker。
+
+## API 接口文档
+
+### 1. PDF 转 Markdown
+
+**接口地址**: `POST /ocr/pdf`
+
+**请求参数**:
+- `file`: PDF 文件（必填）
+- `biz_id`: 业务ID（必填）
+- `is_async`: 是否异步处理，默认 false（可选）
+- `callback_url`: 回调地址，异步模式必填（可选）
+- `skip_pages`: 跳过的页码，逗号分隔，如 "0,2,5"（可选）
+- `limit_pages`: 限制处理页数（可选）
+
+**同步返回示例** (code=200):
+```json
+{
+  "code": 200,
+  "filename": "document.pdf",
+  "taskid": "uuid-string",
+  "bizId": "biz123",
+  "pages": [
+    "第一页的 markdown 内容...",
+    "第二页的 markdown 内容..."
+  ]
+}
+```
+
+**异步返回示例** (code=220):
+```json
+{
+  "code": 220,
+  "filename": "document.pdf",
+  "taskid": "uuid-string",
+  "bizId": "biz123"
+}
+```
+
+### 2. 单张图片转 Markdown
+
+**接口地址**: `POST /ocr/image`
+
+**请求参数**:
+- `file`: 图片文件，支持 jpg/jpeg/png（必填）
+- `biz_id`: 业务ID（必填）
+- `is_async`: 是否异步处理，默认 false（可选）
+- `callback_url`: 回调地址，异步模式必填（可选）
+
+**返回格式**: 同 PDF 接口
+
+### 3. 多张图片批量转 Markdown
+
+**接口地址**: `POST /ocr/images`
+
+**请求参数**:
+- `files`: 多个图片文件（必填）
+- `biz_id`: 业务ID（必填）
+- `is_async`: 是否异步处理，默认 false（可选）
+- `callback_url`: 回调地址，异步模式必填（可选）
+
+**返回格式**: 同 PDF 接口，pages 数组包含每张图片的 markdown 内容
+
+### 4. 查询任务状态
+
+**接口地址**: `GET /task/{task_id}`
+
+**返回示例**:
+```json
+{
+  "task_id": "uuid-string",
+  "biz_id": "biz123",
+  "filename": "document.pdf",
+  "status": "completed",
+  "created_at": 1234567890.123,
+  "completed_at": 1234567895.456,
+  "result": {
+    "code": 200,
+    "filename": "document.pdf",
+    "taskid": "uuid-string",
+    "bizId": "biz123",
+    "pages": ["..."]
+  }
+}
+```
+
+状态值: `queued`, `processing`, `completed`, `failed`
+
+### 5. 队列状态查询
+
+**接口地址**: `GET /queue/status`
+
+**返回示例**:
+```json
+{
+  "queue_size": 5,
+  "total_tasks": 100
+}
+```
+
+### 6. 健康检查
+
+**接口地址**: `GET /`
+
+**返回示例**:
+```json
+{
+  "status": "running",
+  "service": "DeepSeek OCR Service",
+  "version": "1.0.0"
+}
+```
+
+## 使用示例
+
+### Python 示例
+
+```python
+import requests
+
+# 1. PDF 转换 - 同步模式
+with open('document.pdf', 'rb') as f:
+    response = requests.post(
+        'http://localhost:8000/ocr/pdf',
+        files={'file': f},
+        data={
+            'biz_id': 'biz123',
+            'is_async': False,
+            'skip_pages': '0,2',
+            'limit_pages': 10
+        }
+    )
+print(response.json())
+
+# 2. PDF 转换 - 异步模式
+with open('document.pdf', 'rb') as f:
+    response = requests.post(
+        'http://localhost:8000/ocr/pdf',
+        files={'file': f},
+        data={
+            'biz_id': 'biz123',
+            'is_async': True,
+            'callback_url': 'https://your-domain.com/callback'
+        }
+    )
+result = response.json()
+task_id = result['taskid']
+
+# 3. 查询任务状态
+status_response = requests.get(f'http://localhost:8000/task/{task_id}')
+print(status_response.json())
+
+# 4. 单张图片转换
+with open('image.jpg', 'rb') as f:
+    response = requests.post(
+        'http://localhost:8000/ocr/image',
+        files={'file': f},
+        data={
+            'biz_id': 'biz123',
+            'is_async': False
+        }
+    )
+print(response.json())
+
+# 5. 多张图片批量转换
+files = [
+    ('files', open('image1.jpg', 'rb')),
+    ('files', open('image2.jpg', 'rb')),
+    ('files', open('image3.jpg', 'rb'))
+]
+response = requests.post(
+    'http://localhost:8000/ocr/images',
+    files=files,
+    data={
+        'biz_id': 'biz123',
+        'is_async': False
+    }
+)
+print(response.json())
+```
+
+### cURL 示例
+
+```bash
+# PDF 转换
+curl -X POST "http://localhost:8000/ocr/pdf" \
+  -F "file=@document.pdf" \
+  -F "biz_id=biz123" \
+  -F "is_async=false"
+
+# 单张图片转换
+curl -X POST "http://localhost:8000/ocr/image" \
+  -F "file=@image.jpg" \
+  -F "biz_id=biz123" \
+  -F "is_async=false"
+
+# 多张图片转换
+curl -X POST "http://localhost:8000/ocr/images" \
+  -F "files=@image1.jpg" \
+  -F "files=@image2.jpg" \
+  -F "files=@image3.jpg" \
+  -F "biz_id=biz123" \
+  -F "is_async=false"
+
+# 查询任务状态
+curl -X GET "http://localhost:8000/task/{task_id}"
+
+# 查询队列状态
+curl -X GET "http://localhost:8000/queue/status"
+```
+
+## 异步处理说明
+
+### 同步模式 (is_async=false)
+- 请求会等待任务完全处理完成
+- 直接返回处理结果 (code=200)
+- 适合小文件或对实时性要求高的场景
+- 注意：可能因队列等待而超时
+
+### 异步模式 (is_async=true)
+- 请求立即返回 (code=220)
+- 任务在后台队列中处理
+- 处理完成后自动调用 callback_url
+- 推荐用于大文件或批量处理
+- 必须提供 callback_url
+
+### Callback 回调格式
+
+处理成功时:
+```json
+{
+  "code": 200,
+  "filename": "document.pdf",
+  "taskid": "uuid-string",
+  "bizId": "biz123",
+  "pages": ["..."]
+}
+```
+
+处理失败时:
+```json
+{
+  "code": 500,
+  "filename": "document.pdf",
+  "taskid": "uuid-string",
+  "bizId": "biz123",
+  "error": "错误信息"
+}
+```
+
+## 队列处理机制
+
+- **FIFO 原则**: 先提交的任务先处理
+- **单线程处理**: 确保 GPU 资源不冲突
+- **状态跟踪**: 所有任务状态可查询
+- **自动清理**: 建议定期清理已完成的任务状态
+
+## 注意事项
+
+1. **GPU 内存**: 确保有足够的 GPU 内存加载模型
+2. **并发限制**: MAX_CONCURRENCY 控制最大并发数
+3. **超时设置**: 同步模式建议客户端设置较长超时时间
+4. **文件大小**: 建议限制上传文件大小
+5. **回调重试**: Callback 调用失败不会重试，请确保回调服务稳定
+
+## API 文档
+
+启动服务后访问自动生成的文档:
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+

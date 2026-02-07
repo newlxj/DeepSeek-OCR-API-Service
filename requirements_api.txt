@@ -1,0 +1,30 @@
+# DeepSeek OCR API 服务依赖
+
+# Web框架
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# 数据验证
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# HTTP客户端
+httpx>=0.25.0
+
+# 图像处理
+Pillow>=10.0.0
+
+# PDF处理
+PyMuPDF>=1.23.0
+
+# 深度学习框架（已有）
+# torch>=2.0.0
+# transformers>=4.35.0
+
+# vLLM推理引擎（已有）
+# vllm>=0.2.0
+
+# 其他依赖
+einops>=0.7.0
+addict>=2.4.0
